@@ -1,0 +1,111 @@
+esphome:
+  name: ldtr20_radar
+  friendly_name: LDTR-20 Radar (mph)
+
+  # ─── Send CONFIG frame once at boot ────────────────────────────
+  on_boot:
+    priority: 800
+    then:
+      # 43 46 02 00 01 00 0D 0A
+      - uart.write: [0x43,0x46,0x02,0x00,0x01,0x00,0x0D,0x0A]
+
+esp32:
+  board: esp32dev
+
+# ─── Wi-Fi & fallback AP ────────────────────────────────────────
+wifi:
+  networks:
+    - ssid: !secret wifi_ssid
+      password: !secret wifi_password
+    - ssid: !secret iot_wifi_ssid
+      password: !secret iot_wifi_password
+  ap:
+    ssid: ${name} Hotspot
+    password: !secret fallback_password
+
+# ─── Core services ──────────────────────────────────────────────
+logger:
+  level: INFO    # raw frames appear under tag [ldtr_raw]
+
+api:
+  encryption:
+    key: !secret key
+
+web_server:
+  port: 80
+
+ota:
+  platform: esphome
+  password: !secret ota_password
+
+captive_portal:
+
+# ─── Globals for 30-s peak logic ────────────────────────────────
+globals:
+  - id: out_peak_mph
+    type: float
+    initial_value: '0'
+  - id: in_peak_mph
+    type: float
+    initial_value: '0'
+
+# ─── UART hub (white → GPIO19) ─────────────────────────────────
+uart:
+  id: ldtr_uart
+  rx_pin: GPIO19          # LDTR-20 TX → ESP32 RX
+  tx_pin: GPIO18          # (unused for now)
+  baud_rate: 9600
+
+# ─── Parse stream & update peaks every 100 ms ──────────────────
+interval:
+  - interval: 100ms
+    then:
+      - lambda: |-
+          uint8_t byte;
+          static std::string buf;
+
+          while (id(ldtr_uart).available() > 0) {
+            id(ldtr_uart).read_byte(&byte);
+            char c = static_cast<char>(byte);
+
+            if (c == '\n') {                          // end of line
+              if (buf.rfind("V+", 0) == 0 || buf.rfind("V-", 0) == 0) {
+                ESP_LOGI("ldtr_raw", "%s kph", buf.c_str());   // raw log
+                float kmh = atof(buf.c_str() + 2);             // skip "V±"
+                float mph = kmh * 0.621371f;
+
+                if (buf[1] == '+') {                           // outbound
+                  if (mph > id(out_peak_mph)) id(out_peak_mph) = mph;
+                } else {                                       // inbound
+                  if (mph > id(in_peak_mph))  id(in_peak_mph) = mph;
+                }
+              }
+              buf.clear();
+            } else if (c != '\r') {
+              buf.push_back(c);
+            }
+          }
+
+# ─── Two sensors: publish & reset every 30 s ───────────────────
+sensor:
+  - platform: template
+    name: "LDTR-20 Peak Outbound"
+    unit_of_measurement: "mph"
+    accuracy_decimals: 1
+    icon: "mdi:arrow-right-bold"
+    update_interval: 30s
+    lambda: |-
+      float v = id(out_peak_mph);
+      id(out_peak_mph) = 0;     // reset for next window
+      return v;                 // 0 mph if no outbound traffic
+
+  - platform: template
+    name: "LDTR-20 Peak Inbound"
+    unit_of_measurement: "mph"
+    accuracy_decimals: 1
+    icon: "mdi:arrow-left-bold"
+    update_interval: 30s
+    lambda: |-
+      float v = id(in_peak_mph);
+      id(in_peak_mph) = 0;      // reset for next window
+      return v;                 // 0 mph if no inbound traffic
