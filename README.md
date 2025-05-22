@@ -64,8 +64,8 @@ cd ldtr20-radar
 esphome run ldtr20_radar.yaml
 
 After flashing, Home Assistant will auto-discover:
-	•	LDTR-20 Peak Outbound – fastest V+ target (moving away)
-	•	LDTR-20 Peak Inbound  – fastest V- target (moving toward)
+	•	LDTR-20 Peak Outbound – fastest V+ target (moving toward)
+	•	LDTR-20 Peak Inbound  – fastest V- target (moving away)
 
 ⸻
 
