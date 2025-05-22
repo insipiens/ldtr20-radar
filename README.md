@@ -1,10 +1,61 @@
-An ESPHome script to record the speed data from the LDTR20 24mm radar sensor. 
+# LDTR-20 Bidirectional Speed Monitor  
+_ESPHome configuration & helper scripts_
 
-These, according to the blurb, are commonly used in speed warning signs and out of the box only record inbound speeds.
+---
 
-These devices can operate on 12 volts and datasheets are difficult to find. 
+## What this project does
+* **Reads an LDTR-20 24 GHz Doppler radar** entirely over **RS-485**  
+  (brown = B(–), blue = A(+)) using a MAX13487 auto-direction transceiver.  
+* **Sends one configuration frame at boot** so the radar streams **both Doppler
+  directions** (`V+` and `V-`).  
+* **Tracks the fastest target in each direction** during rolling 30-second
+  windows and publishes two numeric sensors to Home Assistant.
 
-However using the datasheet for LDTR04 I discovered you can write to the device and tell it to provide bi-directional data.
+### Direction conventions
 
-The code creates an esphome device with two sensors (outbound and inbound). It records the peak speed for each direction in 30 second intervals.
+| Raw prefix | HA sensor | Meaning (relative to radar head) |
+|------------|-----------|----------------------------------|
+| `V+`       | `sensor.ldtr20_peak_outbound` | Vehicle **moving away** (outbound) |
+| `V-`       | `sensor.ldtr20_peak_inbound`  | Vehicle **approaching** (inbound) |
+
+Values are published in **mph**; if no traffic was seen in a window the sensor
+reports **0 mph**.  
+Every raw frame (`V±000.0 kph`) is also logged at **INFO** for debugging.
+
+---
+
+## Hardware
+
+| Item | Notes |
+|------|-------|
+| **LDTR-20** radar module | Red = 9-12 V, Black = GND, **Blue = RS-485 A(+), Brown = RS-485 B(–)** |
+| **MAX13487** RS-485 ↔ TTL board | Auto-direction; no DE/RE pin control needed |
+| **ESP32** dev board | Any board ESPHome supports |
+| 12 V supply | Powers radar + MAX13487; ESP32 can share 5 V via USB/buck |
+
+*No TTL pins on the radar are used; all data travels over the differential
+pair through the MAX13487.*
+
+---
+
+## How it works
+
+1. **Boot frame** `43 46 02 00 01 00 0D 0A` tells the radar to  
+   * output **both directions** (`0x00`),  
+   * keep default report rate (`0x01`),  
+   * stay in **km/h** (`0x00`) – conversion to mph happens in ESPHome.
+2. A 100 ms `interval:` drains the RS-485 stream, logs each frame, and
+   maintains inbound/outbound peak variables.
+3. Two template sensors publish those peaks every 30 s;
+   they reset to **0 mph** if no traffic was detected.
+
+---
+
+## Quick-start
+
+```bash
+git clone <repo-url>
+cd ldtr20-radar
+# add your Wi-Fi secrets to secrets.yaml
+esphome run ldtr20_radar.yaml
 
