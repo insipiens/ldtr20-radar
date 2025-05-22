@@ -15,8 +15,12 @@ _ESPHome configuration & helper scripts_
 
 | Raw prefix | HA sensor | Meaning (relative to radar head) |
 |------------|-----------|----------------------------------|
-| `V+`       | `sensor.ldtr20_peak_outbound` | Vehicle **moving away** (outbound) |
-| `V-`       | `sensor.ldtr20_peak_inbound`  | Vehicle **approaching** (inbound) |
+| `V+`       | `sensor.ldtr20_peak_outbound` | Vehicle **approaching** (outbound) |
+| `V-`       | `sensor.ldtr20_peak_inbound`  | Vehicle **moving away** (inbound) |
+
+
+Note: You may want to swap the outbound/inbound definitions as it was for a specific use case of mine and would make more sense reversed. 
+
 
 Values are published in **mph**; if no traffic was seen in a window the sensor
 reports **0 mph**.  
