@@ -63,3 +63,30 @@ cd ldtr20-radar
 # add your Wi-Fi secrets to secrets.yaml
 esphome run ldtr20_radar.yaml
 
+After flashing, Home Assistant will auto-discover:
+	•	LDTR-20 Peak Outbound – fastest V+ target (moving away)
+	•	LDTR-20 Peak Inbound  – fastest V- target (moving toward)
+
+⸻
+
+Customisation
+
+Goal	How
+One-direction only	Change the direction byte in the boot frame: 0x01 = inbound only, 0x02 = outbound only.
+Native mph output	Units byte 0x00 → 0x01; then remove the × 0.621 conversion in YAML.
+Different window length	Edit update_interval: of each template sensor.
+Mute raw logging	Set logger: level: WARNING or comment out ESP_LOGI("ldtr_raw", …).
+
+See docs/LDTR04-datasheet-CN.pdf for the full CF… command set
+(sensitivity, minimum speed, etc.) – the LDTR-20 uses the same protocol.
+
+⸻
+
+License & credits
+	•	Datasheet excerpts © Leide Technology
+	•	RS-485 ESPHome integration by @YourName
+
+MIT License — modify and share freely.
+
+
+
